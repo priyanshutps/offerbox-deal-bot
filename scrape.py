@@ -1,6 +1,6 @@
 """Fetch an Amazon.in / Flipkart / Myntra product page and extract deal-card fields."""
 import re, json, time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 
@@ -52,6 +52,15 @@ def _fetch(url, tries=4):
         try:
             r = requests.get(url, impersonate=imp, headers=HDR, timeout=30, allow_redirects=True)
             site = site_of(r.url)
+            q = parse_qs(urlparse(r.url).query)
+            if site is None and q.get("dl"):  # tracking redirect (e.g. linkredirect.in ?dl=<store url>)
+                r = requests.get(q["dl"][0], impersonate=imp, headers=HDR, timeout=30)
+                site = site_of(r.url)
+                q = parse_qs(urlparse(r.url).query)
+            if site == "myntra" and '"pdpData"' not in r.text and q.get("pinProductsCsv"):
+                # collection link: use the first pinned product
+                pid = q["pinProductsCsv"][0].split(",")[0]
+                r = requests.get(f"https://www.myntra.com/{pid}", impersonate=imp, headers=HDR, timeout=30)
             if site is None and r.status_code == 200:
                 # some short links (affiliate converters) use a JS/meta redirect
                 m = re.search(r'(?:url=|location\.href\s*=\s*["\']|href=["\'])(https?://[^"\'>\s]*(?:amazon|flipkart|myntra)[^"\'>\s]*)', r.text, re.I)
@@ -120,13 +129,18 @@ def _flipkart(r):
     soup = BeautifulSoup(t, "html.parser")
     og = lambda p: (soup.find("meta", property=p) or {}).get("content", "")
     h1 = soup.find("h1")
-    title = _txt(h1) or re.sub(r"\s+Price in India.*$", "", og("og:title"))
-    img = og("og:image")
+    h1_first = (h1.find(string=True) or "").strip() if h1 else ""
+    full = re.search(r'"prependingText":"([^"]+)"', t) or re.search(r'"seoFooterTitle":"More about ([^"]+)"', t)
+    ogt = og("og:title")
+    title = (full.group(1) if full else "") or (h1_first.rstrip(".").strip() if h1_first else "") \
+        or ("" if "{TITLE}" in ogt else re.sub(r"\s+Price in India.*$", "", ogt))
+    img = og("og:image").replace("{@width}", "832").replace("{@height}", "832")
     for x in soup(["script", "style"]):
         x.decompose()
     body = soup.get_text("\n", strip=True)
-    i = body.find(title) if title else -1
-    after = body[i + len(title): i + len(title) + 3000] if i >= 0 else body
+    anchor = h1_first or title
+    i = body.find(anchor) if anchor else -1
+    after = body[i + len(anchor): i + len(anchor) + 3000] if i >= 0 else body
 
     price = mrp = disc = None
     m = re.search(r"(\d{1,2})%\n([\d,]+)\n₹([\d,]+)", after)
