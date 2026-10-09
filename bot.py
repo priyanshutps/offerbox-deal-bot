@@ -1,5 +1,5 @@
 """OfferBox deal-card Telegram bot.
-Send it one or more Amazon links -> it replies with a deal card image + ready-to-post caption.
+Send it one or more Amazon / Flipkart / Myntra links -> it replies with a deal card image + ready-to-post caption.
 
 Env vars:
   BOT_TOKEN    token from @BotFather (required)
@@ -17,7 +17,7 @@ log = logging.getLogger("offerbox")
 
 TOKEN = os.environ["BOT_TOKEN"]
 ALLOWED = {int(x) for x in os.environ.get("ALLOWED_IDS", "").replace(" ", "").split(",") if x}
-LINK_RE = re.compile(r"https?://(?:www\.)?(?:amzn\.to|amzn\.in|amazon\.in|a\.co)/\S+", re.I)
+LINK_RE = re.compile(r"https?://\S+", re.I)
 
 
 def short_title(t, max_words=7):
@@ -44,7 +44,8 @@ def make_card(link, workdir):
     card_data = {
         "image": img, "title": d["title"], "price": d["price"], "mrp": d["mrp"], "disc": d["disc"],
         "delivery": d["delivery"], "bought": d["bought"], "badge": d["badge"],
-        "replacement": d["replacement"], "coupon": d["coupon"],
+        "replacement": d["replacement"], "coupon": d["coupon"], "in_stock": d.get("in_stock", True),
+        "deliv_label": "Delivery by " if d.get("site") == "flipkart" else "FREE delivery ",
     }
     out = render(card_data, os.path.join(workdir, "card.jpg"))
     return out, caption(d, link)
@@ -52,7 +53,7 @@ def make_card(link, workdir):
 
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"Send me Amazon links and I'll make OfferBox deal cards.\nYour user ID: {update.effective_user.id}")
+        f"Send me Amazon / Flipkart / Myntra links and I'll make deal cards.\nYour user ID: {update.effective_user.id}")
 
 
 async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -62,7 +63,7 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or update.message.caption or ""
     links = LINK_RE.findall(text)
     if not links:
-        await update.message.reply_text("Amazon link bhejo (amzn.to / amazon.in).")
+        await update.message.reply_text("Amazon / Flipkart / Myntra link bhejo.")
         return
     for link in links:
         link = link.rstrip(").,")
