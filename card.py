@@ -3,7 +3,7 @@ usage: python3 card.py deal.json out.jpg
 json keys: image, title, price, mrp, disc, delivery,
   optional: bought ("1K+ bought in past month"), badge ("Lowest price in 30 days"),
             replacement ("10 days Replacement"), coupon ("5%" or "₹188"),
-            watermark (default "OfferBox Official")
+            watermark (optional, off by default)
 """
 import sys, json, math, os
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -139,12 +139,13 @@ def render(d, out):
                     s(ex - L*math.cos(ang - .45), ey - L*math.sin(ang - .45)),
                     s(ex - L*math.cos(ang + .45), ey - L*math.sin(ang + .45))], fill=(220, 30, 30))
 
-    # watermark: faint, between price and MRP (like the reference)
-    wm = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    wd = ImageDraw.Draw(wm)
-    wd.text(s(x + 230, (price_y + mrp_y) / 2 + 12), d.get("watermark", "OfferBox Official"),
-            font=f("Inter-Bold.otf", 22), fill=(120, 120, 120, 95), anchor="lm")
-    img = Image.alpha_composite(img.convert("RGBA"), wm).convert("RGB")
+    # optional watermark (pass "watermark" in data to enable)
+    if d.get("watermark"):
+        wm = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        wd = ImageDraw.Draw(wm)
+        wd.text(s(x + 230, (price_y + mrp_y) / 2 + 12), d["watermark"],
+                font=f("Inter-Bold.otf", 22), fill=(120, 120, 120, 95), anchor="lm")
+        img = Image.alpha_composite(img.convert("RGBA"), wm).convert("RGB")
 
     img.resize((W, H), Image.LANCZOS).save(out, quality=95)
     return out
