@@ -57,7 +57,7 @@ def render(d, out):
     rows.append(("mrp", None, y)); y += 50
     if d.get("badge"): y += 30; rows.append(("badge", d["badge"], y)); y += 60
     else: y += 6
-    rows.append(("deliv", None, y)); y += 49
+    if d.get("delivery"): rows.append(("deliv", None, y)); y += 49
     rows.append(("stock", None, y)); y += 49
     if d.get("replacement"): rows.append(("repl", d["replacement"], y)); y += 49
     content_bottom = y - 20
@@ -106,10 +106,14 @@ def render(d, out):
             dr.rounded_rectangle(s(x, yy - 35, x + bw + 60, yy + 35), radius=8 * S, fill=RED)
             dr.text(s(x + 30, yy), bt, font=bf, fill="white", anchor="lm")
         elif kind == "deliv":
-            dr.text(s(x, yy), "FREE delivery ", font=rf, fill=INK, anchor="lm")
-            dr.text(s(x + dr.textlength("FREE delivery ", font=rf) / S, yy), d["delivery"], font=bf, fill=INK, anchor="lm")
+            lab = d.get("deliv_label") or "FREE delivery "
+            dr.text(s(x, yy), lab, font=rf, fill=INK, anchor="lm")
+            dr.text(s(x + dr.textlength(lab, font=rf) / S, yy), d["delivery"], font=bf, fill=INK, anchor="lm")
         elif kind == "stock":
-            dr.text(s(x, yy), "In stock", font=rf, fill=GREEN, anchor="lm")
+            if d.get("in_stock", True):
+                dr.text(s(x, yy), "In stock", font=rf, fill=GREEN, anchor="lm")
+            else:
+                dr.text(s(x, yy), "Currently unavailable", font=rf, fill=RED, anchor="lm")
         elif kind == "repl":
             dr.text(s(x, yy), val, font=rf, fill=TEAL, anchor="lm")
 
